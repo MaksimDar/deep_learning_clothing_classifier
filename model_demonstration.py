@@ -8,53 +8,26 @@ import json
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-
-### Виведіть графіки функції втрат і точності для моделі
-def show_graph(history):
-    accuracy_values = history['accuracy']
-    val_accuracy_values = history['val_accuracy']
-
-    loss_values = history['loss']
-    val_loss_values = history['val_loss']
-    
-    epochs = range(1,len(accuracy_values) + 1)
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-    ax1.plot(epochs, accuracy_values, 'bo', label='Training accuracy')
-    ax1.plot(epochs, val_accuracy_values, 'b', label='Validation accuracy')
-    ax1.set_title('Training and validation accuracy')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Accuracy')
-    ax1.legend()
-    
-    ax2.plot(epochs, loss_values, 'bo', label='Training loss')
-    ax2.plot(epochs, val_loss_values, 'b', label='Validation loss')
-    ax2.set_title('Training and validation loss')
-    ax2.set_xlabel('Epochs')
-    ax2.set_ylabel('Loss')
-    ax2.legend()
-
-    plt.tight_layout()
-
-    return fig
+from functions import show_graph
+from translations import TRANSLATIONS
 
 
-### 
-list_categories = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
-
-
+list_categories_en = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
+list_categories_uk = ['Футболка/топ','Штани','Пуловер','Сукня','Пальто','Сандалі', 'Сорочка','Кросівки','Сумка','Черевики']
 model_cnn = keras.models.load_model("best_model_cnn.keras")
 model_vgg16 = keras.models.load_model("best_model_vgg16.keras")
+language = st.session_state.language
+lang_status = 'en' if language == 'English' else 'uk'
+list_categories = list_categories_en if lang_status == 'en' else list_categories_uk
+t = TRANSLATIONS[lang_status]
 
-
-st.title('Модель класифікації для визначення типу одягу')
-
-uploaded_file = st.file_uploader("Виберіть зображення...", type=["jpg", "jpeg", "png"])
+st.title(t['title'])
+uploaded_file = st.file_uploader(t['image_upload'], type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
 
     image = Image.open(uploaded_file)
-    st.image(image, caption='вхідне зображення')
+    st.image(image, caption=t['input_image'])
 
     # Перетворення завантаженого зображення у відтінки сірого відповідно
     gray_image = ImageOps.grayscale(image)
@@ -67,8 +40,7 @@ if uploaded_file is not None:
 
     # Зміна форми масиву для додавання розмірності батчу та каналів
     image_input = img_array.reshape(-1, 28, 28, 1)
-
-    model_type = st.radio('Виберіть модель для класифікації вашого зображення', ['CNN', 'VGG16'])
+    model_type = st.radio(t['model_select'], ['CNN', 'VGG16'])
 
     if model_type == 'CNN':
         # Прогноз CNN
@@ -78,14 +50,14 @@ if uploaded_file is not None:
         image_input_vgg16 = tf.image.resize(tf.image.grayscale_to_rgb(tf.constant(image_input)), (48, 48))
         predictions = model_vgg16.predict(image_input_vgg16)
 
-    st.write('Таблиця результатів')
-    # st.write(predictions)
+    st.write(t['results_table'])
+     # st.write(predictions)
 
     # Таблиця ймовірностей для категорії «одяг»
     prob_df = pd.DataFrame({
-        'Клас': list_categories,
-        'Ймовірність (%)': (predictions[0] * 100).round(2)
-    }).sort_values('Ймовірність (%)', ascending=False)
+        t['class']: list_categories,
+        t['probability']: (predictions[0] * 100).round(2)
+    }).sort_values(t['probability'], ascending=False)
 
     st.write(prob_df)
     result = np.argmax(predictions,axis=1)
@@ -94,7 +66,7 @@ if uploaded_file is not None:
     pred_number = predictions[0][result]
     final_number = float(pred_number*100)
     precision = round(final_number,2)
-    st.write(f'Згідно з таблицею результатів, на фотографії зображено {result_category} з точністю {precision}%.')
+    st.write(f"{t['table_show_result']} {result_category} {t['precision']} {precision}%.")
 
     ### Завантаження результатів моделей точності та втрат 
     if model_type == 'CNN':
@@ -105,6 +77,7 @@ if uploaded_file is not None:
             history_data = json.load(f)
 
     ### Демонстрації точності та втрат        
-    st.write(f'Графіки функції втрат і точності моделі {model_type}')
-    fig = show_graph(history_data)
-    st.pyplot(fig)
+    st.write(f"{t['graph']} {model_type}")
+    show_graph(history_data)
+    st.markdown(f"## {t['conclusion']}:")
+    st.write(t['conclusion_text'])
